@@ -208,6 +208,11 @@ namespace SilksongMultiplayer
                 savedtk2dSpriteCollectionData = this.GetComponent<tk2dSprite>().Collection;
             }
 
+            if (SilksongMultiplayerAPI.hideOuther)
+                this.GetComponent<tk2dSprite>().color = new Color(1, 1, 1, 0.3f);
+            else
+                this.GetComponent<tk2dSprite>().color = new Color(1, 1, 1, 1);
+
             this.transform.position = Vector3.Lerp(savedPosition, targetPosition + positionBias, movingProgress);
             movingProgress += Time.deltaTime / 0.03f;
 

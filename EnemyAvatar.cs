@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using GlobalEnums;
 using Steamworks;
 using TMProOld;
 using UnityEngine;
@@ -23,14 +24,16 @@ namespace SilksongMultiplayer
         private float BossTargetChangeCounterDefault = 15;
 
         private float TargetChangeCounter = 0;
-        private float TargetChangeCounterDefault = 3;
+        private float TargetChangeCounterDefault = 5;
 
         public bool isOwner = true;
 
         public bool isBoss = false;
 
         public bool died = false;
+        public bool disConnect = false;
         public float startCounter = 0.5f;
+        public float NoRespondCounter = 3;
 
         void Start()
         {
@@ -47,7 +50,11 @@ namespace SilksongMultiplayer
                     Multiplier = SilksongMultiplayerAPI.BossHPmultiplier;
                 else
                     Multiplier = SilksongMultiplayerAPI.EnemyHPmultiplier;
-                this.GetComponent<Dummy>().damageMultiplier = 1f / (1 + (SteamMatchmaking.GetNumLobbyMembers(SilksongMultiplayerAPI.RoomManager.currentRoomID) - 1) * Multiplier);
+
+                if ((1 + (SteamMatchmaking.GetNumLobbyMembers(SilksongMultiplayerAPI.RoomManager.currentRoomID) - 1) * Multiplier) > 0)
+                    this.GetComponent<Dummy>().damageMultiplier = 1f / (1 + (SteamMatchmaking.GetNumLobbyMembers(SilksongMultiplayerAPI.RoomManager.currentRoomID) - 1) * Multiplier);
+                else
+                    this.GetComponent<Dummy>().damageMultiplier = 1f;
             }
 
             savedPosition   =   this.transform.position;
@@ -57,7 +64,7 @@ namespace SilksongMultiplayer
 
         void Update()
         {
-            if (this.GetComponent<HealthManager>() && this.GetComponent<HealthManager>().hp < 0)
+            if (this.GetComponent<HealthManager>() && this.GetComponent<HealthManager>().hp < 0 )
             {
                 died = true;
             }
@@ -72,7 +79,7 @@ namespace SilksongMultiplayer
             }
             else
             {
-                if (SilksongMultiplayerAPI.currentScene == SilksongMultiplayerAPI.currentOwnedScene)
+                if (SilksongMultiplayerAPI.currentScene == SilksongMultiplayerAPI.currentOwnedScene && disConnect == false)
                 {
                     isOwner = true;
                 }
@@ -86,6 +93,43 @@ namespace SilksongMultiplayer
             {
                 this.transform.position = Vector3.Lerp(savedPosition, targetPosition, movingProgress);
                 movingProgress += Time.deltaTime / 0.03f;
+
+                if(NoRespondCounter > 0)
+                {
+                    NoRespondCounter -= Time.deltaTime;
+                }
+                else if(disConnect == false)
+                {
+                    disConnect = true;
+                    isOwner = true;
+
+                    HitInstance hitInstance = new HitInstance
+                    {
+                        Source = new GameObject(),
+                        DamageDealt = 9999,
+                        Direction = 0,
+                        AttackType = (AttackTypes)1,
+                        Multiplier = 500,
+                        MagnitudeMultiplier = 500,
+                        NailElement = (NailElements)0,
+                        NonLethal = false,
+                        CriticalHit = false,
+                        CanWeakHit = false,
+                        DamageScalingLevel = 50,
+                        SpecialType = (SpecialTypes)0,
+                        IsHeroDamage = true,
+                        SilkGeneration = HitSilkGeneration.None
+                    };
+
+
+
+                    if (this.GetComponent<HealthManager>())
+                    {
+                        this.GetComponent<HealthManager>().hp = -100;
+                        this.GetComponent<HealthManager>().Hit(hitInstance);
+                        this.GetComponent<HealthManager>().Die(0, AttackTypes.Generic, true);
+                    }
+                }
             }
             else
             {
@@ -175,6 +219,7 @@ namespace SilksongMultiplayer
             targetPosition = newPosition;
             savedPosition = this.transform.position;
             movingProgress = 0;
+            NoRespondCounter = 5;
         }
     }
 }

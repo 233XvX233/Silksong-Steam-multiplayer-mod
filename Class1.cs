@@ -8,6 +8,7 @@
     using GlobalSettings;
     using HarmonyLib;
     using HutongGames.PlayMaker.Actions;
+    using QuestPlaymakerActions;
     using Steamworks;
     using TeamCherry.Localization;
     using UnityEngine;
@@ -21,7 +22,7 @@
         }
     }
 
-    [BepInPlugin("com.XvX", "XvX", "1.0.0.0")]
+    [BepInPlugin("com.XvX", "XvX", "0.10.8.0")]
     public class Plugin : BaseUnityPlugin
     {
 
@@ -36,6 +37,7 @@
         private ConfigEntry<string> SkinLink3;
         private ConfigEntry<string> SkinLink4;
 
+        private ConfigEntry<bool> ShowComments;
 
         void Awake()
         {
@@ -43,6 +45,9 @@
             enablePvP = Config.Bind("General", "enablePvP", false, "是否开启pvp");
 
             SilksongMultiplayerAPI.enablePvP = enablePvP.Value;
+
+            ShowComments = Config.Bind("General", "ShowComments", true, "是否开启留言");
+            SilksongMultiplayerAPI.showComments = ShowComments.Value;
 
             BossHPmultiplier = Config.Bind("General", "BossHPmultiplier", 1f, "boss血量倍率(对于每个额外玩家，设置为0不加血量，设置为1则每多一个玩家血量加一倍)");
 

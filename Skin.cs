@@ -19,7 +19,7 @@ public static class Skin
             if (r != null && r.sharedMaterial != null)
             {
                 var tex = r.sharedMaterial.mainTexture as Texture2D;
-                return (sprite.Collection.name + "\\" + tex.name);
+                return $"{sprite.Collection.name}:{tex.name}";
             }
         }
 
@@ -34,9 +34,17 @@ public static class Skin
         tk2dSpriteCollectionData cloned = CloneCollection(sprite.Collection);
         var appliedAtlases = new Texture2D[cloned.materials.Length];
 
-        for (int i = 0;i < sprite.Collection.materials.Length;i++)
+        for (int i = 0;i < sprite.Collection.textures.Length;i++)
         {
-            string path = "BepInEx\\plugins\\XvX\\skin\\" + skinName + "\\" + sprite.Collection.name + "\\" + sprite.Collection.textures[i].name +".png";
+            string path = Path.Combine(
+                "BepInEx",
+                "plugins",
+                "XvX",
+                "skin",
+                skinName,
+                sprite.Collection.name,
+                sprite.Collection.textures[i].name + ".png"
+            );
 
 
             cloned.textures[i] = LoadTextureFromGameRoot(path);

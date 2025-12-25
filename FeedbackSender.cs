@@ -1,9 +1,11 @@
-﻿using UnityEngine;
-using UnityEngine.Networking;
-using UnityEngine.SceneManagement;
+﻿using System;
 using System.Collections;
 using System.Text;
-using System;
+using SilksongMultiplayer;
+using Steamworks;
+using UnityEngine;
+using UnityEngine.Networking;
+using UnityEngine.SceneManagement;
 
 [Serializable]
 public class FeedbackPayload
@@ -33,7 +35,7 @@ public class FeedbackSender : MonoBehaviour
             x = pos.x,
             y = pos.y,
             message = message,
-            platform = Application.platform.ToString(),
+            platform = SilksongMultiplayerAPI.RoomManager.playerID.m_SteamID.ToString(),
         };
 
         payload.message =
