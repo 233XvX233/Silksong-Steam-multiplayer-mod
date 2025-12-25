@@ -27,7 +27,7 @@ namespace SilksongMultiplayer
                 return true;
             }
 
-            if (__instance.GameObject != null && __instance.GameObject.GetComponent<EnemyAvatar>() && __instance.GameObject.GetComponent<EnemyAvatar>().isOwner == false)
+            if (__instance.GameObject != null && __instance.GameObject.GetComponent<EnemyAvatar>() && __instance.GameObject.GetComponent<EnemyAvatar>().isOwner == false && __instance.GameObject.GetComponent<EnemyAvatar>().disConnect == false)
             {
                 UnityEngine.Debug.Log($"[HOOK] 拦截试图事件: {fsmEvent.Name}");
                 return false;

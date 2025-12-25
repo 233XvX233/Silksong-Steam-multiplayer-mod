@@ -25,6 +25,8 @@ namespace SilksongMultiplayer
         public Vector2Int textureSize = new Vector2Int(1,1);
         public bool DoNotSend = false;
 
+        public float OverflowDamage = 0;
+
         public float damageMultiplier = 1;
         public void Init()
         {
@@ -65,6 +67,21 @@ namespace SilksongMultiplayer
             }
         }
 
+        public float savedHP = 100;
+        public void Update()
+        {
+            if (cocoon == false && this.gameObject.GetComponent<EnemyAvatar>().isOwner && boss)
+            {
+                if(savedHP != this.GetComponent<HealthManager>().hp)
+                {
+                    NetworkDataSender.SendTargetEnemyHpData(bossName, this.GetComponent<HealthManager>().hp, SilksongMultiplayerAPI.currentScene);
+
+                    savedHP = this.GetComponent<HealthManager>().hp;
+                }
+            }
+        }
+
+
         public IHitResponder.HitResponse Hit(HitInstance hitInstance)
         {
 
@@ -80,7 +97,7 @@ namespace SilksongMultiplayer
                 this.transform.parent.GetComponent<PlayerAvatar>().HitByHero(hitInstance);
             }
 
-            if(DoNotSend == false)
+            if (DoNotSend == false)
             {
                 if (cocoon)
                 {
@@ -128,6 +145,17 @@ namespace SilksongMultiplayer
             if(__instance.gameObject.GetComponent<Dummy>())
             {
                     hitInstance.Multiplier *= __instance.gameObject.GetComponent<Dummy>().damageMultiplier;
+
+
+                __instance.gameObject.GetComponent<Dummy>().OverflowDamage +=
+                ((float)hitInstance.DamageDealt * hitInstance.Multiplier) % 1;
+
+                if(__instance.gameObject.GetComponent<Dummy>().OverflowDamage >= 1)
+                {
+                    hitInstance.DamageDealt += Mathf.CeilToInt(1 / __instance.gameObject.GetComponent<Dummy>().damageMultiplier);
+                    __instance.gameObject.GetComponent<Dummy>().OverflowDamage -= 1;
+                }
+
             }
                 
 

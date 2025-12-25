@@ -18,6 +18,7 @@ namespace SilksongMultiplayer
     {
         public Steamworks.CSteamID currentRoomID;
 
+
         private float lastSendTime;
         private const float sendInterval = 0.03f; // 30ms 发送一次
         private string mapName;
@@ -32,6 +33,9 @@ namespace SilksongMultiplayer
         private float mapNameSendCounter = 0f;
 
         public int cocoonHP = 25;
+
+        public Canvas DebugCanvaComponent;
+        public GameObject DebugText;
 
         void Start()
         {
@@ -59,36 +63,74 @@ namespace SilksongMultiplayer
 
             if (SilksongMultiplayerAPI.enterRoom)
             {
-                canva = nameCanva.AddComponent<Canvas>();
-                canva.renderMode = RenderMode.WorldSpace;
-                canva.sortingLayerName = "HUD";
-                canva.sortingLayerID = 629535577;
-                canva.sortingOrder = 50;
-
-
-                canva.renderMode = RenderMode.ScreenSpaceCamera;
-
-                RectTransform rect = nameCanva.GetComponent<RectTransform>();
-                rect.sizeDelta = new Vector2(2560, 1440);
-
-                nameText = new GameObject("nameText");
-                nameText.transform.SetParent(nameCanva.transform);
-
-                // 必须有 CanvasRenderer
-                nameText.AddComponent<CanvasRenderer>();
-                nameText.transform.localScale = Vector3.one * 0.01f;
-                Text text = nameText.AddComponent<Text>();
-                text.text = SteamFriends.GetPersonaName(); // 或 SteamFriends.GetPersonaName()
-                text.font = SilksongMultiplayerAPI.savedFont;
-                text.fontSize = 50;
-                text.alignment = TextAnchor.MiddleCenter;
-
-                ulong XvXSteamId64 = 76561198929282998UL;
-                ulong truthSteamId64 = 76561199835946204UL;
-
-                if (SteamUser.GetSteamID().m_SteamID == XvXSteamId64 || SteamUser.GetSteamID().m_SteamID == truthSteamId64)
+                if(SteamMatchmaking.GetNumLobbyMembers(SilksongMultiplayerAPI.RoomManager.currentRoomID) > 1)
                 {
-                    text.color = Color.yellow;
+                    canva = nameCanva.AddComponent<Canvas>();
+                    canva.renderMode = RenderMode.WorldSpace;
+                    canva.sortingLayerName = "HUD";
+                    canva.sortingLayerID = 629535577;
+                    canva.sortingOrder = 50;
+
+
+                    canva.renderMode = RenderMode.ScreenSpaceCamera;
+
+                    RectTransform rect = nameCanva.GetComponent<RectTransform>();
+                    rect.sizeDelta = new Vector2(2560, 1440);
+
+                    nameText = new GameObject("nameText");
+                    nameText.transform.SetParent(nameCanva.transform);
+
+                    // 必须有 CanvasRenderer
+                    nameText.AddComponent<CanvasRenderer>();
+                    nameText.transform.localScale = Vector3.one * 0.01f;
+                    Text text = nameText.AddComponent<Text>();
+                    text.text = SteamFriends.GetPersonaName(); // 或 SteamFriends.GetPersonaName()
+                    text.font = SilksongMultiplayerAPI.savedFont;
+                    text.fontSize = 50;
+                    text.alignment = TextAnchor.MiddleCenter;
+
+                    ulong XvXSteamId64 = 76561198929282998UL;
+                    ulong truthSteamId64 = 76561199835946204UL;
+
+                    if (SteamUser.GetSteamID().m_SteamID == XvXSteamId64 || SteamUser.GetSteamID().m_SteamID == truthSteamId64)
+                    {
+                        text.color = Color.yellow;
+                    }
+                }
+
+
+                if(SilksongMultiplayerAPI.debug)
+                {
+                    GameObject DebugCanva = new GameObject("DebugCanva");
+                    DebugCanva.transform.SetPositionAndRotation(this.transform.position, Quaternion.identity);
+                    DebugCanva.transform.SetParent(this.transform);
+
+                    
+                    DebugCanvaComponent = DebugCanva.AddComponent<Canvas>();
+                    DebugCanvaComponent.renderMode = RenderMode.WorldSpace;
+                    DebugCanvaComponent.sortingLayerName = "HUD";
+                    DebugCanvaComponent.sortingLayerID = 629535577;
+                    DebugCanvaComponent.sortingOrder = 50;
+
+
+                    DebugCanvaComponent.renderMode = RenderMode.ScreenSpaceCamera;
+
+                    RectTransform rect = DebugCanva.GetComponent<RectTransform>();
+                    rect.sizeDelta = new Vector2(256000, 144000);
+
+                    DebugText = new GameObject("DebugText");
+                    DebugText.transform.SetParent(DebugCanva.transform);
+
+                    // 必须有 CanvasRenderer
+                    DebugText.AddComponent<CanvasRenderer>();
+                    DebugText.transform.localScale = Vector3.one * 0.01f;
+                    Text text = DebugText.AddComponent<Text>();
+                    text.text = SteamFriends.GetPersonaName(); // 或 SteamFriends.GetPersonaName()
+                    text.font = SilksongMultiplayerAPI.savedFont;
+                    text.fontSize = 30;
+                    text.alignment = TextAnchor.MiddleCenter;
+
+                    SilksongMultiplayerAPI.DebugText = text;
                 }
 
                 cocoon = new GameObject("cocoon");
@@ -119,6 +161,38 @@ namespace SilksongMultiplayer
         tk2dSpriteCollectionData savedtk2dSpriteCollectionData = new tk2dSpriteCollectionData();
         void Update()
         {
+            if(SilksongMultiplayerAPI.DebugText != null)
+            {
+                string text = "玩家当前场景";
+
+                foreach(KeyValuePair<CSteamID,string> pair in SilksongMultiplayerAPI.playerSceneMap)
+                {
+                    text += Environment.NewLine + SteamFriends.GetFriendPersonaName(pair.Key) + " = " + pair.Value;
+                }
+
+                text += Environment.NewLine + "场景所有权";
+
+                foreach (KeyValuePair<string, CSteamID> pair in SilksongMultiplayerAPI.sceneOwnersList)
+                {
+                    text += Environment.NewLine + SteamFriends.GetFriendPersonaName(pair.Value) + " = " + pair.Key;
+                }
+
+                SilksongMultiplayerAPI.DebugText.text = text;
+
+                DebugCanvaComponent.transform.localPosition = Vector3.zero + new Vector3(0, 5f, 0);
+                DebugText.transform.localPosition = Vector3.zero;
+                DebugText.GetComponent<RectTransform>().sizeDelta = new Vector2(2560, 1440);
+
+                if (this.transform.localScale.x < 0)
+                    DebugCanvaComponent.transform.localScale = new Vector2(-1, 1);
+                else
+                    DebugCanvaComponent.transform.localScale = new Vector2(1, 1);
+            }
+
+
+
+
+
             if (this.GetComponent<tk2dSprite>().Collection != savedtk2dSpriteCollectionData)
             {
                 Skin.ChangeSkinOnObject(this.gameObject, SilksongMultiplayerAPI.skinName);
@@ -172,7 +246,7 @@ namespace SilksongMultiplayer
             mapNameSendCounter -= Time.deltaTime;
             if (mapNameSendCounter <= 0 || SceneManager.GetActiveScene().name != mapName)
             {
-                if(SceneManager.GetActiveScene().name != mapName)
+                if(SceneManager.GetActiveScene().name != mapName && SilksongMultiplayerAPI.showComments)
                 {
                     List<FeedbackEntry> entries = SilksongMultiplayerAPI.RoomManager.githubTextReader.entries;
 
@@ -181,9 +255,8 @@ namespace SilksongMultiplayer
 
                     foreach (FeedbackEntry entry in list)
                     {
-                        float f = UnityEngine.Random.Range(0, 1);
-
-                        if(f < 15/ list.Count)
+                        float f = UnityEngine.Random.value;
+                        if (f < 15f / list.Count)
                         {
                             GameObject comment = GameObject.Instantiate(new GameObject(), new Vector3(entry.x, entry.y, 0), Quaternion.identity);
                             PlayerComment playerComment = comment.AddComponent<PlayerComment>();
@@ -247,7 +320,7 @@ namespace SilksongMultiplayer
                 }
             }
 
-            if (SilksongMultiplayerAPI.enterRoom)
+            if (SilksongMultiplayerAPI.enterRoom && canva != null)
             {
                 canva.transform.localPosition = Vector3.zero + new Vector3(0, 2.5f, 0);
                 nameText.transform.localPosition = Vector3.zero;
@@ -261,11 +334,18 @@ namespace SilksongMultiplayer
 
             if (createColliderCounter < 0 && createColliderCounter > -100)
             {
-                if (SilksongMultiplayerAPI.enterRoom)
+                if (SilksongMultiplayerAPI.enterRoom && canva != null)
                 {
                     canva.renderMode = RenderMode.WorldSpace;
                     canva.transform.localPosition = Vector3.zero;
                     nameText.transform.localPosition = Vector3.zero;
+                }
+
+                if (SilksongMultiplayerAPI.enterRoom && DebugCanvaComponent != null)
+                {
+                    DebugCanvaComponent.renderMode = RenderMode.WorldSpace;
+                    DebugCanvaComponent.transform.localPosition = Vector3.zero;
+                    DebugText.transform.localPosition = Vector3.zero;
                 }
 
                 createColliderCounter = -100;
@@ -273,6 +353,16 @@ namespace SilksongMultiplayer
             else
             {
                 createColliderCounter -= Time.deltaTime;
+            }
+
+            if (Input.GetKeyDown(KeyCode.F5) && SilksongMultiplayerAPI.KnockedDown == false)
+            {
+                SilksongMultiplayerAPI.Hero_Hornet.GetComponent<HeroController>().acceptingInput = true;
+            }
+
+            if (Input.GetKeyDown(KeyCode.F4) )
+            {
+                SilksongMultiplayerAPI.hideOuther = !SilksongMultiplayerAPI.hideOuther;
             }
 
             if (Input.GetKeyDown(KeyCode.F8) && SilksongMultiplayerAPI.KnockedDown == true)
@@ -287,7 +377,7 @@ namespace SilksongMultiplayer
                 SilksongMultiplayerAPI.Suicide = true;
 
                 HeroController.instance.TakeDamage(new GameObject(), CollisionSide.other, 100, HazardType.ENEMY);
-
+                
                 SilksongMultiplayerAPI.Suicide = false;
 
                 NetworkDataSender.PlayerKnockDown(false);
@@ -367,6 +457,9 @@ namespace SilksongMultiplayer
             // Prefix 返回 bool，返回 false 就会阻止原函数
             static bool Prefix(int amount, bool hasBlueHealth, bool allowFracturedMaskBreak)
             {
+                if(SteamMatchmaking.GetNumLobbyMembers(SilksongMultiplayerAPI.RoomManager.currentRoomID) == 1)
+                    return true;
+
 
                 // 返回 false = 阻止原始 TakeDamage 执行
                 if (SilksongMultiplayerAPI.AllPlayerKnockedDown || SilksongMultiplayerAPI.Suicide)

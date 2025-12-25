@@ -42,7 +42,7 @@ public class GithubTextReader : MonoBehaviour
         Debug.Log($"Loaded entries: {entries.Count}");
         if (entries.Count > 0)
         {
-            Debug.Log($"First: {entries[0].sceneName} ({entries[0].x},{entries[0].y}) {entries[0].message}");
+            print($"First: {entries[0].sceneName} ({entries[0].x},{entries[0].y}) {entries[0].message}");
         }
     }
 

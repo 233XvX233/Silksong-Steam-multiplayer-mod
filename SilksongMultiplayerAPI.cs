@@ -49,6 +49,7 @@ namespace SilksongMultiplayer
         public static bool Suicide = false;
 
         public static Text PlayerListText;
+        public static Text DebugText;
 
         public static Dictionary<CSteamID, PlayerAvatar> remotePlayers = new Dictionary<CSteamID, PlayerAvatar>();
         public static List<Transform> remotePlayersTransformList = new List<Transform>();
@@ -56,6 +57,7 @@ namespace SilksongMultiplayer
         public static string currentScene = "";
 
         public static Dictionary<string, CSteamID> sceneOwnersList = new Dictionary<string, CSteamID>();
+        public static Dictionary<CSteamID, string> playerSceneMap = new Dictionary<CSteamID, string>();
 
         public static string currentOwnedScene = "";
 
@@ -64,6 +66,10 @@ namespace SilksongMultiplayer
         public static string skinLink2;
         public static string skinLink3;
         public static string skinLink4;
+
+        public static bool debug = false;
+        public static bool hideOuther = false;
+        public static bool showComments = true;
 
         public static List<CSteamID> GetRoomMembers()
         {
@@ -239,6 +245,13 @@ namespace SilksongMultiplayer
 
         public static void OnChangeScene(string sceneName)
         {
+            // ===== 新增：记录自己离开前的场景（oldScene）=====
+            string oldScene = null;
+            if (roomOwner)
+            {
+                playerSceneMap.TryGetValue(SteamUser.GetSteamID(), out oldScene);
+            }
+
             currentScene = sceneName;
 
             if (roomOwner)
@@ -252,7 +265,6 @@ namespace SilksongMultiplayer
                         sceneOwnersList.Remove(owned);
                     }
 
-                    // 正确：为本场景记录“我”为 owner（不要用未初始化的 out 变量）
                     ownerId = SteamUser.GetSteamID();
                     sceneOwnersList[sceneName] = ownerId;
 
@@ -262,6 +274,32 @@ namespace SilksongMultiplayer
                 else
                 {
                     NetworkDataSender.SendSceneOwner(ownerId.m_SteamID, sceneName);
+                }
+
+                // ===== 原逻辑：更新自己所在场景 =====
+                playerSceneMap[SteamUser.GetSteamID()] = sceneName;
+
+                // ===== 新增：如果我离开的 oldScene 的 owner 是我，且我离开后该场景没人了 -> 清除该场景所有权 =====
+                if (!string.IsNullOrEmpty(oldScene) && oldScene != sceneName)
+                {
+                    if (sceneOwnersList.TryGetValue(oldScene, out var oldOwner) && oldOwner == SteamUser.GetSteamID())
+                    {
+                        bool anyoneLeftInOldScene = false;
+                        foreach (var kv in playerSceneMap)
+                        {
+                            if (kv.Key == SteamUser.GetSteamID()) continue; // 我已经离开 oldScene 了
+                            if (kv.Value == oldScene)
+                            {
+                                anyoneLeftInOldScene = true;
+                                break;
+                            }
+                        }
+
+                        if (!anyoneLeftInOldScene)
+                        {
+                            sceneOwnersList.Remove(oldScene);
+                        }
+                    }
                 }
             }
 
@@ -284,25 +322,97 @@ namespace SilksongMultiplayer
             }
         }
 
+
         public static void OnOutherChangeScene(string sceneName, CSteamID steamID)
         {
             if (!roomOwner) return;
 
+            // 更新玩家所在场景
+            playerSceneMap[steamID] = sceneName;
+
             if (!sceneOwnersList.TryGetValue(sceneName, out CSteamID existing))
             {
-                // 移除该玩家之前绑定的旧场景
+                // 这个玩家以前拥有的场景
                 string prev = GetSceneNameBySceneOwnersSteamID(steamID);
-                if (prev != null) sceneOwnersList.Remove(prev);
 
-                sceneOwnersList[sceneName] = steamID; // 明确设为该玩家
+                if (prev != null && prev != sceneName)
+                {
+                    HandleOwnerLeavingScene(prev, steamID);
+                }
+
+                sceneOwnersList[sceneName] = steamID;
                 NetworkDataSender.SendSceneOwner(steamID.m_SteamID, sceneName);
             }
             else
             {
-                // 如果已经有记录，确保广播的是记录里的那位 owner
+                if(GetSceneNameBySceneOwnersSteamID(steamID) != null && GetSceneNameBySceneOwnersSteamID(steamID) != sceneName)
+                {
+                    sceneOwnersList.Remove(GetSceneNameBySceneOwnersSteamID(steamID));
+                }
+
                 NetworkDataSender.SendSceneOwner(existing.m_SteamID, sceneName);
             }
         }
+
+
+        private static bool TryTransferSceneOwner(string sceneName, CSteamID leavingOwner)
+        {
+            if (!sceneOwnersList.TryGetValue(sceneName, out var currentOwner)) return false;
+            if (currentOwner != leavingOwner) return false;
+
+            foreach (var kv in playerSceneMap)
+            {
+                var playerId = kv.Key;
+                var playerScene = kv.Value;
+
+                if (playerId == leavingOwner) continue;
+                if (playerScene != sceneName) continue;
+
+                sceneOwnersList[sceneName] = playerId;
+                NetworkDataSender.SendSceneOwner(playerId.m_SteamID, sceneName);
+                return true;
+            }
+
+            return false; // 没人接管
+        }
+
+        private static int CountPlayersInScene(string sceneName, CSteamID? excluding = null)
+        {
+            int count = 0;
+            foreach (var kv in playerSceneMap)
+            {
+                if (excluding.HasValue && kv.Key == excluding.Value) continue;
+                if (kv.Value == sceneName) count++;
+            }
+            return count;
+        }
+
+        private static bool IsSceneEmpty(string sceneName, CSteamID? excluding = null)
+        {
+            return CountPlayersInScene(sceneName, excluding) == 0;
+        }
+
+        private static void HandleOwnerLeavingScene(string sceneName, CSteamID leavingOwner)
+        {
+            if (!sceneOwnersList.TryGetValue(sceneName, out var currentOwner)) return;
+            if (currentOwner != leavingOwner) return;
+
+            // 先尝试转交
+            bool transferred = TryTransferSceneOwner(sceneName, leavingOwner);
+
+            if (transferred) return;
+
+            // 转交失败：如果场景已经空了，就清掉 owner
+            // 注意：排除 leavingOwner（把他当作已离开）
+            if (IsSceneEmpty(sceneName, excluding: leavingOwner))
+            {
+                sceneOwnersList.Remove(sceneName);
+                // 可选：广播“无 owner”（取决于你协议是否支持）
+                // NetworkDataSender.SendSceneOwner(0, sceneName);
+            }
+        }
+
+
 
         public static string GetSceneNameBySceneOwnersSteamID(CSteamID steamID)
         {
