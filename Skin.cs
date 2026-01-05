@@ -29,35 +29,42 @@ public static class Skin
 
     public static void ChangeSkinOnObject(GameObject gameObject,string skinName)
     {
-        //Debug.Log("收到更换贴图请求");
-        tk2dBaseSprite sprite = gameObject.GetComponent<tk2dBaseSprite>();
-        tk2dSpriteCollectionData cloned = CloneCollection(sprite.Collection);
-        var appliedAtlases = new Texture2D[cloned.materials.Length];
-
-        for (int i = 0;i < sprite.Collection.textures.Length;i++)
+        if(1==1)
         {
-            string path = Path.Combine(
-                "BepInEx",
-                "plugins",
-                "XvX",
-                "skin",
-                skinName,
-                sprite.Collection.name,
-                sprite.Collection.textures[i].name + ".png"
-            );
+            //Debug.Log("收到更换贴图请求");
+            tk2dBaseSprite sprite = gameObject.GetComponent<tk2dBaseSprite>();
+            tk2dSpriteCollectionData cloned = CloneCollection(sprite.Collection);
+            var appliedAtlases = new Texture2D[cloned.materials.Length];
 
+            for (int i = 0; i < sprite.Collection.textures.Length; i++)
+            {
+                string path = Path.Combine(
+                    "BepInEx",
+                    "plugins",
+                    "XvX",
+                    "skin",
+                    skinName,
+                    sprite.Collection.name,
+                    sprite.Collection.textures[i].name + ".png"
+                );
 
-            cloned.textures[i] = LoadTextureFromGameRoot(path);
-            cloned.materials[i].mainTexture = LoadTextureFromGameRoot(path);
-            appliedAtlases[i] = LoadTextureFromGameRoot(path);
+                string fullPath = Path.Combine(Paths.GameRootPath, path);
+                //Debug.Log("图片路径" + fullPath);
+                if (File.Exists(fullPath))
+                {
+                    cloned.textures[i] = LoadTextureFromGameRoot(path);
+                    cloned.materials[i].mainTexture = LoadTextureFromGameRoot(path);
+                    appliedAtlases[i] = LoadTextureFromGameRoot(path);
+                }
+            }
+
+            var lockComp = gameObject.GetComponent<SkinLock>() ?? gameObject.AddComponent<SkinLock>();
+            lockComp.Cloned = cloned;
+            lockComp.Atlases = appliedAtlases;
+            lockComp.dataName = sprite.Collection.name;
+
+            ApplyClonedCollectionToSprite(sprite, cloned);
         }
-
-        var lockComp = gameObject.GetComponent<SkinLock>() ?? gameObject.AddComponent<SkinLock>();
-        lockComp.Cloned = cloned;
-        lockComp.Atlases = appliedAtlases;
-        lockComp.dataName = sprite.Collection.name;
-
-        ApplyClonedCollectionToSprite(sprite, cloned);
     }
 
     public static int GetCurrentAtlas(tk2dBaseSprite sprite)

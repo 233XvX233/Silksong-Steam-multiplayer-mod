@@ -22,7 +22,7 @@
         }
     }
 
-    [BepInPlugin("com.XvX", "XvX", "0.10.8.0")]
+    [BepInPlugin("com.XvX", "XvX", "0.10.20.0")]
     public class Plugin : BaseUnityPlugin
     {
 
@@ -38,6 +38,7 @@
         private ConfigEntry<string> SkinLink4;
 
         private ConfigEntry<bool> ShowComments;
+        private ConfigEntry<bool> DebugText;
 
         void Awake()
         {
@@ -48,6 +49,9 @@
 
             ShowComments = Config.Bind("General", "ShowComments", true, "是否开启留言");
             SilksongMultiplayerAPI.showComments = ShowComments.Value;
+
+            DebugText = Config.Bind("DebugText", "DebugText", false, "是否开启信息显示");
+            SilksongMultiplayerAPI.debug = DebugText.Value;
 
             BossHPmultiplier = Config.Bind("General", "BossHPmultiplier", 1f, "boss血量倍率(对于每个额外玩家，设置为0不加血量，设置为1则每多一个玩家血量加一倍)");
 

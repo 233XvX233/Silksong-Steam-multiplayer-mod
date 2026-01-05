@@ -58,6 +58,20 @@ namespace SilksongMultiplayer
 
         public void Update()
         {
+            if (SilksongMultiplayerAPI.roomOwner)
+            {
+                if(SilksongMultiplayerAPI.sceneOwnersList.TryGetValue(SilksongMultiplayerAPI.currentScene, out CSteamID value))
+                {
+                    if(value == SteamUser.GetSteamID())
+                    {
+                        SilksongMultiplayerAPI.currentOwnedScene = SilksongMultiplayerAPI.currentScene;
+                    }
+                }
+            }
+
+
+
+
             if(Input.GetKeyDown(KeyCode.F9))
             {
                 // 创建个沙包
@@ -120,10 +134,16 @@ namespace SilksongMultiplayer
             {
                 string playerList = "玩家列表";
                 int memberCount = SteamMatchmaking.GetNumLobbyMembers(currentRoomID);
+                playerList += " 当前人数:" + memberCount;
+                playerList += Environment.NewLine;
+                playerList += "房间id " + currentRoomID;
                 for (int i = 0; i < memberCount; i++)
                 {
                     CSteamID memberID = SteamMatchmaking.GetLobbyMemberByIndex(currentRoomID, i);
-                    playerList += Environment.NewLine + SteamFriends.GetFriendPersonaName(memberID);
+                    
+                    playerList += Environment.NewLine;
+
+                    playerList += SteamFriends.GetFriendPersonaName(memberID);
                 }
 
                 SilksongMultiplayerAPI.PlayerListText.text = playerList;
@@ -226,10 +246,16 @@ namespace SilksongMultiplayer
             if (enterRoom && SilksongMultiplayerAPI.PlayerListText != null)
             {
                 string playerList = "玩家列表";
+                playerList += " 当前人数:" + memberCount;
+                playerList += Environment.NewLine;
+                playerList += "房间id " + currentRoomID;
                 for (int i = 0; i < memberCount; i++)
                 {
                     CSteamID memberID = SteamMatchmaking.GetLobbyMemberByIndex(currentRoomID, i);
-                    playerList += Environment.NewLine + SteamFriends.GetFriendPersonaName(memberID);
+
+                    playerList += Environment.NewLine;
+
+                    playerList += SteamFriends.GetFriendPersonaName(memberID);
                 }
 
                 SilksongMultiplayerAPI.PlayerListText.text = playerList;
@@ -313,6 +339,7 @@ namespace SilksongMultiplayer
                 PlayerList.GetComponent<Text>().lineSpacing = 1;
                 PlayerList.GetComponent<Text>().alignment = TextAnchor.UpperLeft;
                 PlayerList.GetComponent<Text>().text = "";
+                PlayerList.GetComponent<Text>().fontSize = 20;
                 SilksongMultiplayerAPI.PlayerListText = PlayerList.GetComponent<Text>();
             }
         }

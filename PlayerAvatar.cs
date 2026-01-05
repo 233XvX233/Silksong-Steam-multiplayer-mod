@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using GlobalEnums;
 using Steamworks;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 
@@ -104,7 +105,7 @@ namespace SilksongMultiplayer
             ulong XvXSteamId64 = 76561198929282998UL;
             ulong truthSteamId64 = 76561199835946204UL;
 
-            if (steamID.m_SteamID == XvXSteamId64 || steamID.m_SteamID == truthSteamId64)
+            if (steamID.m_SteamID == XvXSteamId64 || SteamUser.GetSteamID().m_SteamID == truthSteamId64)
             {
                 text.color = Color.yellow;
             }
@@ -124,8 +125,7 @@ namespace SilksongMultiplayer
                 wideCompassIcon.name = "wideCompassIconClone";
             }
 
-            if(GameObject.Find("SceneBorder(Clone)"))
-                NetworkDataSender.SendMapChangeNotification(mapName = GameObject.Find("SceneBorder(Clone)").scene.name);
+            NetworkDataSender.SendMapChangeNotification(mapName = SceneManager.GetActiveScene().name); 
 
 
 
@@ -247,14 +247,10 @@ namespace SilksongMultiplayer
                 movingProgress = 1;
             }
 
-            if (GameObject.Find("SceneBorder(Clone)"))
-            {
-                if (GameObject.Find("SceneBorder(Clone)").scene.name == mapName)
-                    Hide(false);
-                else
-                    Hide(true);
-            }
-
+            if (SceneManager.GetActiveScene().name == mapName)
+                Hide(false);
+            else
+                Hide(true);
 
             if (createColliderCounter < 0 && createColliderCounter > -100)
             {

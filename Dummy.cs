@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using GlobalEnums;
@@ -70,7 +71,7 @@ namespace SilksongMultiplayer
         public float savedHP = 100;
         public void Update()
         {
-            if (cocoon == false && this.gameObject.GetComponent<EnemyAvatar>().isOwner && boss)
+            if (cocoon == false && this.gameObject.GetComponent<EnemyAvatar>() && this.gameObject.GetComponent<EnemyAvatar>().isOwner && boss)
             {
                 if(savedHP != this.GetComponent<HealthManager>().hp)
                 {
@@ -158,6 +159,50 @@ namespace SilksongMultiplayer
 
             }
                 
+
+            return true;
+        }
+    }
+
+    [HarmonyPatch(typeof(HealthManager))]
+    [HarmonyPatch("Die")]
+    [HarmonyPatch(new Type[]
+{
+    typeof(float?),
+    typeof(AttackTypes),
+    typeof(NailElements),
+    typeof(GameObject),
+    typeof(bool),
+    typeof(float),
+    typeof(bool),
+    typeof(bool)
+})]
+    public class Die_Patch
+    {
+        // Token: 0x06000013 RID: 19 RVA: 0x00002230 File Offset: 0x00000430
+        static bool Prefix(HealthManager __instance)
+        {
+            if (__instance == null || __instance.gameObject == null)
+            {
+                return true;
+            }
+
+            if (__instance.gameObject.GetComponent<Dummy>() && __instance.gameObject.GetComponent<EnemyAvatar>().isOwner)
+            {
+                NetworkDataSender.SendEnemieDieData(__instance.gameObject.name, SilksongMultiplayerAPI.currentScene);
+
+                if (SilksongMultiplayerAPI.roomOwner)
+                {
+
+                    if (SilksongMultiplayerAPI.sceneEnemyData.TryGetValue(SilksongMultiplayerAPI.currentScene, out SceneEnemyData sceneData) == false)
+                    {
+                        SilksongMultiplayerAPI.sceneEnemyData.Add(SilksongMultiplayerAPI.currentScene, new SceneEnemyData());
+                    }
+
+                    if (SilksongMultiplayerAPI.sceneEnemyData[SilksongMultiplayerAPI.currentScene].diedEnemy.Contains(__instance.gameObject.name) == false)
+                        SilksongMultiplayerAPI.sceneEnemyData[SilksongMultiplayerAPI.currentScene].diedEnemy.Add(__instance.gameObject.name);
+                }
+            }
 
             return true;
         }

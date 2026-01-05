@@ -25,6 +25,8 @@ namespace SilksongMultiplayer
         SceneOwner = 14,
         AllKnockDown = 15,
         Skin = 16,
-
+        Teleport = 17,
+        EnemieDie = 18,
+        BattleSceneWave = 19,
     }
 }

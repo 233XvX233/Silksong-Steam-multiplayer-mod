@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using BepInEx.Logging;
+using HutongGames.PlayMaker.Actions;
 using Steamworks;
 using UnityEngine;
 using UnityEngine.UI;
@@ -47,6 +48,7 @@ namespace SilksongMultiplayer
         public static bool AllPlayerKnockedDown = false;
         public static bool KnockedDown = false;
         public static bool Suicide = false;
+        public static bool pushWaveByOuther = false;
 
         public static Text PlayerListText;
         public static Text DebugText;
@@ -58,6 +60,7 @@ namespace SilksongMultiplayer
 
         public static Dictionary<string, CSteamID> sceneOwnersList = new Dictionary<string, CSteamID>();
         public static Dictionary<CSteamID, string> playerSceneMap = new Dictionary<CSteamID, string>();
+        public static Dictionary<string, SceneEnemyData> sceneEnemyData = new Dictionary<string, SceneEnemyData>();
 
         public static string currentOwnedScene = "";
 
@@ -70,6 +73,7 @@ namespace SilksongMultiplayer
         public static bool debug = false;
         public static bool hideOuther = false;
         public static bool showComments = true;
+        public static bool cheat = true;
 
         public static List<CSteamID> GetRoomMembers()
         {
@@ -183,7 +187,7 @@ namespace SilksongMultiplayer
 
         public static void CloneAnimatorOfObject(GameObject gameObject, GameObject cloneTarget)
         {
-            if(cloneTarget.GetComponent<tk2dSpriteAnimator>() && cloneTarget.GetComponent<tk2dSprite>())
+            if (cloneTarget.GetComponent<tk2dSpriteAnimator>() && cloneTarget.GetComponent<tk2dSprite>())
             {
                 tk2dSprite spriteRenderer = gameObject.AddComponent<tk2dSprite>();
                 tk2dSpriteAnimator animator = gameObject.AddComponent<tk2dSpriteAnimator>();
@@ -203,26 +207,26 @@ namespace SilksongMultiplayer
             SilksongMultiplayerAPI.AllPlayerKnockedDown = false;
         }
 
-        public static void ChangeEnemyTarget(ulong targetID,string enemyName)
+        public static void ChangeEnemyTarget(ulong targetID, string enemyName)
         {
 
             CSteamID memberID = new CSteamID(targetID);
 
             Debug.Log("切换boss目标为：" + memberID.m_SteamID);
 
-            if(GameObject.Find(enemyName) == false || GameObject.Find(enemyName).GetComponent<EnemyAvatar>() == false)
+            if (GameObject.Find(enemyName) == false || GameObject.Find(enemyName).GetComponent<EnemyAvatar>() == false)
                 return;
 
             EnemyAvatar enemy = GameObject.Find(enemyName).GetComponent<EnemyAvatar>();
 
             if (SilksongMultiplayerAPI.remotePlayers.TryGetValue(memberID, out PlayerAvatar playerAvatar))
             {
-                Debug.Log("切换" + enemy.name +"目标为其他玩家");
+                Debug.Log("切换" + enemy.name + "目标为其他玩家");
                 enemy.TargetPlayer = playerAvatar.gameObject;
             }
             else
             {
-                Debug.Log("切换" + enemy.name +"目标为自身");
+                Debug.Log("切换" + enemy.name + "目标为自身");
                 enemy.TargetPlayer = SilksongMultiplayerAPI.Hero_Hornet;
             }
         }
@@ -231,7 +235,7 @@ namespace SilksongMultiplayer
         {
             currentOwnedScene = sceneName;
 
-            if(currentScene == currentOwnedScene)
+            if (currentScene == currentOwnedScene)
             {
                 foreach (HealthManager enemyHealthManager in HealthManager.EnumerateActiveEnemies())
                 {
@@ -245,60 +249,79 @@ namespace SilksongMultiplayer
 
         public static void OnChangeScene(string sceneName)
         {
-            // ===== 新增：记录自己离开前的场景（oldScene）=====
-            string oldScene = null;
-            if (roomOwner)
+            if (!roomOwner)
             {
-                playerSceneMap.TryGetValue(SteamUser.GetSteamID(), out oldScene);
+                currentScene = sceneName;
+
+                if (currentScene == currentOwnedScene)
+                {
+                    foreach (HealthManager hm in HealthManager.EnumerateActiveEnemies())
+                    {
+                        if (hm.gameObject.TryGetComponent<EnemyAvatar>(out var ea))
+                            ea.isOwner = true;
+                    }
+                }
+
+                return;
             }
 
+            // ✅ 用 currentScene 作为旧场景来源，最可靠
+            string oldScene = currentScene;
             currentScene = sceneName;
 
-            if (roomOwner)
+            // ✅ 先更新自己所在场景，避免旧场景判断把自己算进去
+            playerSceneMap[SteamUser.GetSteamID()] = sceneName;
+
+            // ===== 进入新场景：如果新场景没人，则我成为 owner =====
+            if (!sceneOwnersList.TryGetValue(sceneName, out CSteamID ownerId))
             {
-                if (!sceneOwnersList.TryGetValue(sceneName, out CSteamID ownerId))
+                ownerId = SteamUser.GetSteamID();
+                sceneOwnersList[sceneName] = ownerId;
+
+                ChangeCurrentOwnedScene(sceneName);
+                NetworkDataSender.SendSceneOwner(ownerId.m_SteamID, sceneName);
+            }
+            else
+            {
+                NetworkDataSender.SendSceneOwner(ownerId.m_SteamID, sceneName);
+
+                if (sceneEnemyData.TryGetValue(sceneName, out SceneEnemyData a))
                 {
-                    // 先清掉旧的“我”所拥有的场景映射（如果有）
-                    string owned = GetSceneNameBySceneOwnersSteamID(SteamUser.GetSteamID());
-                    if (owned != null)
+                    foreach (string diedEnemieName in a.diedEnemy)
                     {
-                        sceneOwnersList.Remove(owned);
+                        var go = GameObject.Find(diedEnemieName);
+                        if (go && go.TryGetComponent<EnemyAvatar>(out var av) && av.isOwner == false)
+                        {
+                            av.NoRespondCounter = -1;
+                        }
+                    }
+                }
+            }
+
+            // ===== 离开旧场景：如果旧场景 owner 是我 且旧场景没人了 => 清理 =====
+            if (!string.IsNullOrEmpty(oldScene) && oldScene != sceneName)
+            {
+                if (sceneOwnersList.TryGetValue(oldScene, out var oldOwner) && oldOwner == SteamUser.GetSteamID())
+                {
+                    bool anyoneLeftInOldScene = false;
+                    foreach (var kv in playerSceneMap)
+                    {
+                        if (kv.Key == SteamUser.GetSteamID()) continue; // 我已经算在新场景
+                        if (kv.Value == oldScene)
+                        {
+                            anyoneLeftInOldScene = true;
+                            break;
+                        }
                     }
 
-                    ownerId = SteamUser.GetSteamID();
-                    sceneOwnersList[sceneName] = ownerId;
-
-                    ChangeCurrentOwnedScene(sceneName);
-                    NetworkDataSender.SendSceneOwner(ownerId.m_SteamID, sceneName);
-                }
-                else
-                {
-                    NetworkDataSender.SendSceneOwner(ownerId.m_SteamID, sceneName);
-                }
-
-                // ===== 原逻辑：更新自己所在场景 =====
-                playerSceneMap[SteamUser.GetSteamID()] = sceneName;
-
-                // ===== 新增：如果我离开的 oldScene 的 owner 是我，且我离开后该场景没人了 -> 清除该场景所有权 =====
-                if (!string.IsNullOrEmpty(oldScene) && oldScene != sceneName)
-                {
-                    if (sceneOwnersList.TryGetValue(oldScene, out var oldOwner) && oldOwner == SteamUser.GetSteamID())
+                    if (!anyoneLeftInOldScene)
                     {
-                        bool anyoneLeftInOldScene = false;
-                        foreach (var kv in playerSceneMap)
-                        {
-                            if (kv.Key == SteamUser.GetSteamID()) continue; // 我已经离开 oldScene 了
-                            if (kv.Value == oldScene)
-                            {
-                                anyoneLeftInOldScene = true;
-                                break;
-                            }
-                        }
+                        sceneEnemyData.Remove(oldScene);
+                        sceneOwnersList.Remove(oldScene);
 
-                        if (!anyoneLeftInOldScene)
-                        {
-                            sceneOwnersList.Remove(oldScene);
-                        }
+                        // ✅ 只在当前 ownedScene 还是旧场景时才清空，避免误伤新场景
+                        if (currentOwnedScene == oldScene)
+                            ChangeCurrentOwnedScene("");
                     }
                 }
             }
@@ -312,15 +335,10 @@ namespace SilksongMultiplayer
                         ea.isOwner = true;
                 }
             }
-            else
-            {
-                foreach (HealthManager hm in HealthManager.EnumerateActiveEnemies())
-                {
-                    if (hm.gameObject.TryGetComponent<EnemyAvatar>(out var ea))
-                        ea.isOwner = false;
-                }
-            }
+
+            CrearEmptySceneOwner();
         }
+
 
 
         public static void OnOutherChangeScene(string sceneName, CSteamID steamID)
@@ -330,7 +348,7 @@ namespace SilksongMultiplayer
             // 更新玩家所在场景
             playerSceneMap[steamID] = sceneName;
 
-            if (!sceneOwnersList.TryGetValue(sceneName, out CSteamID existing))
+            if (!sceneOwnersList.TryGetValue(sceneName, out CSteamID existing))//如果进入空场景
             {
                 // 这个玩家以前拥有的场景
                 string prev = GetSceneNameBySceneOwnersSteamID(steamID);
@@ -343,15 +361,26 @@ namespace SilksongMultiplayer
                 sceneOwnersList[sceneName] = steamID;
                 NetworkDataSender.SendSceneOwner(steamID.m_SteamID, sceneName);
             }
-            else
+            else//进入有人场景
             {
-                if(GetSceneNameBySceneOwnersSteamID(steamID) != null && GetSceneNameBySceneOwnersSteamID(steamID) != sceneName)
+                if (GetSceneNameBySceneOwnersSteamID(steamID) != null && GetSceneNameBySceneOwnersSteamID(steamID) != sceneName)
                 {
+                    sceneEnemyData.Remove(GetSceneNameBySceneOwnersSteamID(steamID));
                     sceneOwnersList.Remove(GetSceneNameBySceneOwnersSteamID(steamID));
                 }
 
                 NetworkDataSender.SendSceneOwner(existing.m_SteamID, sceneName);
+
+                if (sceneEnemyData.TryGetValue(sceneName, out SceneEnemyData a))
+                {
+                    foreach (string diedEnemieName in sceneEnemyData[sceneName].diedEnemy)
+                    {
+                        NetworkDataSender.SendEnemieDieData(diedEnemieName, sceneName);
+                    }
+                }
             }
+
+            CrearEmptySceneOwner();
         }
 
 
@@ -407,6 +436,7 @@ namespace SilksongMultiplayer
             if (IsSceneEmpty(sceneName, excluding: leavingOwner))
             {
                 sceneOwnersList.Remove(sceneName);
+                sceneEnemyData.Remove(sceneName);
                 // 可选：广播“无 owner”（取决于你协议是否支持）
                 // NetworkDataSender.SendSceneOwner(0, sceneName);
             }
@@ -424,6 +454,27 @@ namespace SilksongMultiplayer
                 }
             }
             return null; // 没找到
+        }
+    
+
+        public static void CrearEmptySceneOwner()
+        {
+            foreach (var kvp in sceneOwnersList)
+            {
+                bool findPlayer = false;
+                foreach (var player in playerSceneMap)
+                {
+                    if(player.Value == kvp.Key)
+                    {
+                        findPlayer = true;
+                    }
+                }
+
+                if (!findPlayer)
+                {
+                    sceneOwnersList.Remove(kvp.Key);
+                }
+            }
         }
     }
 }

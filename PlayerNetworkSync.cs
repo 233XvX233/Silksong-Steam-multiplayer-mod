@@ -39,6 +39,8 @@ namespace SilksongMultiplayer
 
         void Start()
         {
+            //GameManager.instance.playerData.hasBrolly = true;
+
             string savePath = Path.Combine(BepInEx.Paths.GameRootPath, "BepInEx", "plugins", "XvX", "skin", SilksongMultiplayerAPI.skinName, "Knight", "atlas0.png");
             NetworkDataReceiver.DownloadImageAsync(SilksongMultiplayerAPI.skinLink1, savePath);
 
@@ -161,21 +163,44 @@ namespace SilksongMultiplayer
         tk2dSpriteCollectionData savedtk2dSpriteCollectionData = new tk2dSpriteCollectionData();
         void Update()
         {
-            if(SilksongMultiplayerAPI.DebugText != null)
+            if(SilksongMultiplayerAPI.Hero_Hornet.transform.Find("HeroBox"))
+                SilksongMultiplayerAPI.Hero_Hornet.transform.Find("HeroBox").transform.localPosition = Vector3.zero;
+
+
+
+
+            if (SilksongMultiplayerAPI.DebugText != null)
             {
-                string text = "玩家当前场景";
+                string text = "玩家当前场景" + SilksongMultiplayerAPI.currentScene;
 
                 foreach(KeyValuePair<CSteamID,string> pair in SilksongMultiplayerAPI.playerSceneMap)
                 {
                     text += Environment.NewLine + SteamFriends.GetFriendPersonaName(pair.Key) + " = " + pair.Value;
                 }
 
-                text += Environment.NewLine + "场景所有权";
+                text += Environment.NewLine + "场景所有权" + SilksongMultiplayerAPI.currentOwnedScene;
 
                 foreach (KeyValuePair<string, CSteamID> pair in SilksongMultiplayerAPI.sceneOwnersList)
                 {
                     text += Environment.NewLine + SteamFriends.GetFriendPersonaName(pair.Value) + " = " + pair.Key;
                 }
+
+                text += Environment.NewLine + "已死亡小怪";
+
+                foreach (KeyValuePair<string, SceneEnemyData> pair in SilksongMultiplayerAPI.sceneEnemyData)
+                {
+                    foreach(string enemie in pair.Value.diedEnemy)
+                        text += Environment.NewLine + pair.Key + " " +  enemie;
+                }
+
+                text += Environment.NewLine + "连战房数据";
+                foreach (KeyValuePair<string, SceneEnemyData> pair in SilksongMultiplayerAPI.sceneEnemyData)
+                {
+                    foreach (KeyValuePair<string, int> enemie in pair.Value.battleSceneData)
+                        text += Environment.NewLine + pair.Key + " " + enemie.Key + " " + enemie.Value;
+                }
+
+
 
                 SilksongMultiplayerAPI.DebugText.text = text;
 
@@ -267,7 +292,7 @@ namespace SilksongMultiplayer
 
                 mapName = SceneManager.GetActiveScene().name;
 
-                SilksongMultiplayerAPI.currentScene = mapName;
+                //SilksongMultiplayerAPI.currentScene = mapName;
 
                 NetworkDataSender.SendMapChangeNotification(mapName);
 
@@ -355,12 +380,25 @@ namespace SilksongMultiplayer
                 createColliderCounter -= Time.deltaTime;
             }
 
-            if (Input.GetKeyDown(KeyCode.F5) && SilksongMultiplayerAPI.KnockedDown == false)
+            if (Input.GetKeyDown(KeyCode.F2) && SilksongMultiplayerAPI.roomOwner)
             {
-                SilksongMultiplayerAPI.Hero_Hornet.GetComponent<HeroController>().acceptingInput = true;
+                foreach(BattleScene battleScene in GameObject.FindObjectsByType<BattleScene>(FindObjectsSortMode.None))
+                {
+                    battleScene.WaveEnd();
+                }
             }
 
-            if (Input.GetKeyDown(KeyCode.F4) )
+            if (Input.GetKeyDown(KeyCode.F3) && SilksongMultiplayerAPI.cheat)
+            {
+                NetworkDataSender.SendTeleportData(SceneManager.GetActiveScene().name, GameManager.instance.entryGateName, SilksongMultiplayerAPI.Hero_Hornet.transform.position);
+            }
+            
+            if (Input.GetKeyDown(KeyCode.F5) && SilksongMultiplayerAPI.KnockedDown == false)
+            {
+                HeroController.instance.RegainControl();
+            }
+
+            if (Input.GetKeyDown(KeyCode.F4))
             {
                 SilksongMultiplayerAPI.hideOuther = !SilksongMultiplayerAPI.hideOuther;
             }
@@ -457,7 +495,7 @@ namespace SilksongMultiplayer
             // Prefix 返回 bool，返回 false 就会阻止原函数
             static bool Prefix(int amount, bool hasBlueHealth, bool allowFracturedMaskBreak)
             {
-                if(SteamMatchmaking.GetNumLobbyMembers(SilksongMultiplayerAPI.RoomManager.currentRoomID) == 1)
+                if(SteamMatchmaking.GetNumLobbyMembers(SilksongMultiplayerAPI.RoomManager.currentRoomID) <= 1)
                     return true;
 
 
@@ -515,6 +553,25 @@ namespace SilksongMultiplayer
                     }
                 }
 
+                return true;
+            }
+        }
+
+
+        [HarmonyPatch(typeof(HeroController), nameof(HeroController.TakeQuickDamage), new[] { typeof(int), typeof(bool), typeof(bool) })]
+        public static class HeroController_TakeQuickDamage_Patch
+        {
+            static bool Prefix(HeroController __instance)
+            {
+                return true;
+
+
+
+                if (SilksongMultiplayerAPI.Hero_Hornet.gameObject.GetComponent<tk2dSpriteAnimator>().CurrentClip.name != "Wound")
+                {
+                    UnityEngine.Debug.Log("拦截TakeQuickDamage");
+                    return false;       // 跳过原方法
+                }
                 return true;
             }
         }

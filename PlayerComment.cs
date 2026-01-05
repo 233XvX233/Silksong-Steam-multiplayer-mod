@@ -8,6 +8,7 @@ public class PlayerComment : MonoBehaviour
 {
     public GameObject nameText;
     public Canvas canva;
+    SpriteRenderer spriteRenderer;
     public float minDistance = 1;
     public float randomBias = 0;
     GameObject bg;
@@ -75,7 +76,7 @@ public class PlayerComment : MonoBehaviour
 
 
 
-        SpriteRenderer spriteRenderer = this.gameObject.AddComponent<SpriteRenderer>();
+        spriteRenderer = this.gameObject.AddComponent<SpriteRenderer>();
 
         Rect spriteSize = new Rect(0, 0, 60, 60);
         Vector2Int textureSize = new Vector2Int(1, 1);
@@ -102,11 +103,13 @@ public class PlayerComment : MonoBehaviour
     {
         if(Vector2.Distance(this.transform.position,SilksongMultiplayerAPI.Hero_Hornet.transform.position) < 4)
         {
+            spriteRenderer.color = new Color(1, 1, 1, 0);
             nameText.SetActive(true);
             bg.SetActive(true);
         }
         else
         {
+            spriteRenderer.color = new Color(1, 1, 1, 1);
             nameText.SetActive(false);
             bg.SetActive(false);
         }

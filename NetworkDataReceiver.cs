@@ -9,6 +9,7 @@ using GlobalEnums;
 using HutongGames.PlayMaker;
 using Steamworks;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace SilksongMultiplayer
 {
@@ -84,6 +85,15 @@ namespace SilksongMultiplayer
                     break;
                 case NetworkMessageType.Skin:
                     HandleSkinData(data, senderID, ref offset);
+                    break;
+                case NetworkMessageType.Teleport:
+                    HandleTeleportData(data, senderID, ref offset);
+                    break;
+                case NetworkMessageType.EnemieDie:
+                    HandleEnemieDieData(data, senderID, ref offset);
+                    break;
+                case NetworkMessageType.BattleSceneWave:
+                    HandleBattleSceneWave(data, senderID, ref offset);
                     break;
 
             }
@@ -491,6 +501,7 @@ namespace SilksongMultiplayer
                 }
                 else if (SilksongMultiplayerAPI.currentScene == sceneName)
                 {
+                    SilksongMultiplayerAPI.ChangeCurrentOwnedScene("");
                     foreach (HealthManager enemyHealthManager in HealthManager.EnumerateActiveEnemies())
                     {
                         if (enemyHealthManager.gameObject.GetComponent<EnemyAvatar>())
@@ -560,6 +571,88 @@ namespace SilksongMultiplayer
             await File.WriteAllBytesAsync(saveFullPath, data);
 
             return saveFullPath;
+        }
+
+        public static void HandleTeleportData(byte[] data, CSteamID senderID, ref int offset)
+        {
+            string sceneName = PacketDeserializer.ReadString(data, ref offset);
+            string entryGateName = PacketDeserializer.ReadString(data, ref offset);
+            float x = PacketDeserializer.ReadFloat(data, ref offset);
+            float y = PacketDeserializer.ReadFloat(data, ref offset);
+
+            if(SceneManager.GetActiveScene().name != sceneName)
+                GameManager.instance.ChangeToScene(sceneName, entryGateName, 1);
+            else
+                SilksongMultiplayerAPI.Hero_Hornet.transform.position = new Vector3(x, y, SilksongMultiplayerAPI.Hero_Hornet.transform.position.z);
+        }
+
+        public static void HandleEnemieDieData(byte[] data, CSteamID senderID, ref int offset)
+        {
+            string enemyName = PacketDeserializer.ReadString(data, ref offset);
+            string sceneName = PacketDeserializer.ReadString(data, ref offset);
+
+            if(sceneName == SilksongMultiplayerAPI.currentScene)
+            {
+                if (GameObject.Find(enemyName) && GameObject.Find(enemyName).GetComponent<EnemyAvatar>().isOwner == false)
+                {
+                    GameObject.Find(enemyName).GetComponent<EnemyAvatar>().NoRespondCounter = -1;
+                }
+            }
+
+
+            if(SilksongMultiplayerAPI.roomOwner)
+            {
+                
+                if(SilksongMultiplayerAPI.sceneEnemyData.TryGetValue(sceneName, out SceneEnemyData sceneData) == false)
+                {
+                    SilksongMultiplayerAPI.sceneEnemyData.Add(sceneName,new SceneEnemyData());
+                }
+
+                if(SilksongMultiplayerAPI.sceneEnemyData[sceneName].diedEnemy.Contains(enemyName) == false)
+                    SilksongMultiplayerAPI.sceneEnemyData[sceneName].diedEnemy.Add(enemyName);
+            }
+        }
+
+        public static void HandleBattleSceneWave(byte[] data, CSteamID senderID, ref int offset)
+        {
+            string sceneName = PacketDeserializer.ReadString(data, ref offset);
+            string sceneObjectName = PacketDeserializer.ReadString(data, ref offset);
+            int wave = PacketDeserializer.ReadInt(data, ref offset);
+            bool byOwner = PacketDeserializer.ReadBool(data, ref offset);
+
+
+            if (SilksongMultiplayerAPI.roomOwner)
+            {
+
+                if (SilksongMultiplayerAPI.sceneEnemyData.TryGetValue(sceneName, out SceneEnemyData sceneData) == false)
+                {
+                    SilksongMultiplayerAPI.sceneEnemyData.Add(sceneName, new SceneEnemyData());
+                }
+
+
+                if(SilksongMultiplayerAPI.sceneEnemyData[sceneName].battleSceneData.TryGetValue(sceneObjectName,out int value) == false)
+                    SilksongMultiplayerAPI.sceneEnemyData[sceneName].battleSceneData.Add(sceneObjectName,wave);
+
+                if(wave > SilksongMultiplayerAPI.sceneEnemyData[sceneName].battleSceneData[sceneObjectName])
+                {
+                    SilksongMultiplayerAPI.sceneEnemyData[sceneName].battleSceneData[sceneObjectName] = wave;
+                    NetworkDataSender.SendBattleSceneWave(sceneName, sceneObjectName, wave, true);
+                    byOwner = true;
+                }
+                else if (wave < SilksongMultiplayerAPI.sceneEnemyData[sceneName].battleSceneData[sceneObjectName])
+                {
+                    NetworkDataSender.SendBattleSceneWave(sceneName, sceneObjectName, SilksongMultiplayerAPI.sceneEnemyData[sceneName].battleSceneData[sceneObjectName], true);
+                }
+            }
+
+            if(byOwner && SilksongMultiplayerAPI.currentScene == sceneName && GameObject.Find(sceneObjectName))
+            {
+                GameObject.Find(sceneObjectName).GetComponent<BattleScene>().currentWave = wave;
+                SilksongMultiplayerAPI.pushWaveByOuther = true;
+
+                GameObject.Find(sceneObjectName).GetComponent<BattleScene>().WaveEnd();
+
+            }
         }
     }
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Text;
+using HutongGames.PlayMaker.Actions;
 using Steamworks;
 using UnityEngine;
 
@@ -252,6 +253,45 @@ namespace SilksongMultiplayer
 
             Broadcast(data, EP2PSend.k_EP2PSendReliable);
 
+        }
+
+        public static void SendTeleportData(string sceneName,string entryGateName, Vector2 position)
+        {
+            // 1. 打包数据
+            byte[] data = PacketSerializer.Combine(
+                PacketSerializer.SerializeByte((byte)NetworkMessageType.Teleport), // 新枚举类型
+                PacketSerializer.SerializeString(sceneName),
+                PacketSerializer.SerializeString(entryGateName),
+                PacketSerializer.SerializeFloat(position.x),
+                PacketSerializer.SerializeFloat(position.y)
+            );
+
+            Broadcast(data, EP2PSend.k_EP2PSendReliable);
+        }
+
+        public static void SendEnemieDieData(string enemyName, string sceneName)
+        {
+            // 1. 打包数据
+            byte[] data = PacketSerializer.Combine(
+                PacketSerializer.SerializeByte((byte)NetworkMessageType.EnemieDie), // 新枚举类型
+                PacketSerializer.SerializeString(enemyName),
+                PacketSerializer.SerializeString(sceneName)
+            );
+
+            Broadcast(data, EP2PSend.k_EP2PSendReliable);
+        }
+
+        public static void SendBattleSceneWave(string sceneName, string sceneObjectName,int wave,bool byOwner)
+        {
+            byte[] data = PacketSerializer.Combine(
+                PacketSerializer.SerializeByte((byte)NetworkMessageType.BattleSceneWave), // 新枚举类型
+                PacketSerializer.SerializeString(sceneName),
+                PacketSerializer.SerializeString(sceneObjectName),
+                PacketSerializer.SerializeInt(wave),
+                PacketSerializer.SerializeBool(byOwner)
+            );
+
+            Broadcast(data, EP2PSend.k_EP2PSendReliable);
         }
     }
 }
